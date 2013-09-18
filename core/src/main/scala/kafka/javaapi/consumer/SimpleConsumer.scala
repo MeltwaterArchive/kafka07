@@ -20,7 +20,7 @@ package kafka.javaapi.consumer
 import kafka.utils.threadsafe
 import kafka.javaapi.message.ByteBufferMessageSet
 import kafka.javaapi.MultiFetchResponse
-import kafka.api.FetchRequest
+import kafka.api.{DeleteTopicRequest, FetchRequest}
 
 /**
  * A consumer of kafka messages
@@ -31,6 +31,10 @@ class SimpleConsumer(val host: String,
                      val soTimeout: Int,
                      val bufferSize: Int) {
   val underlying = new kafka.consumer.SimpleConsumer(host, port, soTimeout, bufferSize)
+
+  def deleteTopicForPartition(request: DeleteTopicRequest) {
+    underlying.deleteTopicForPartition(request)
+  }
 
   /**
    *  Fetch a set of messages from a topic.

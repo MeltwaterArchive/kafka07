@@ -55,16 +55,22 @@ private[kafka] class LogManager(val config: KafkaConfig,
   private val logRetentionMsMap = getMsMap(config.logRetentionHoursMap)
   private val logRollMsMap = getMsMap(config.logRollHoursMap)
 
-  /* Initialize a log for each subdirectory of the main log directory */
-
+  /**
+   * Initialize a log for each subdirectory of the main log directory
+   * Represents (Topic -> (Partition -> LogFile))
+   */
   private val logs = new Pool[String, Pool[Int, Log]]()
+
   if(!logDir.exists()) {
     info("No log directory found, creating '" + logDir.getAbsolutePath() + "'")
     logDir.mkdirs()
   }
+
   if(!logDir.isDirectory() || !logDir.canRead())
     throw new IllegalArgumentException(logDir.getAbsolutePath() + " is not a readable log directory.")
+
   val subDirs = logDir.listFiles()
+
   if(subDirs != null) {
     for(dir <- subDirs) {
       if(!dir.isDirectory()) {
@@ -355,4 +361,18 @@ private[kafka] class LogManager(val config: KafkaConfig,
 
   def getAllTopics(): Iterator[String] = logs.keys.iterator
   def getTopicPartitionsMap() = topicPartitionsMap
+
+  def deleteTopicFromPartition(topic: String, partition: Int) {
+      if (logs.contains(topic) && logs.get(topic).contains(partition)) {
+        val logToRemove: Log = logs.get(topic).remove(partition)
+        debug("Closing the log segment handles")
+        logToRemove.close()
+        debug("Deleting segment files for the topic %s".format(topic))
+        logToRemove.dir.listFiles().foreach { _.delete() }
+        info("Deleting topic directory")
+        logToRemove.dir.delete()
+      } else {
+        throw new IllegalArgumentException("Topic or partition incorrect.")
+      }
+  }
 }

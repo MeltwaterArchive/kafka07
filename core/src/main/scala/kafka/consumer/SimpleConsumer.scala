@@ -67,6 +67,39 @@ class SimpleConsumer(val host: String,
     }
   }
 
+
+  def deleteTopicForPartition(request: DeleteTopicRequest) {
+    lock synchronized {
+      val startTime = SystemTime.nanoseconds
+      getOrMakeConnection()
+      var response: Tuple2[Receive,Int] = null
+      try {
+        sendRequest(request)
+        response = getResponse
+        if (response._2 != 0) {
+          throw new IllegalArgumentException("Incorrect request sent for delete")
+        }
+      } catch {
+        case e : java.io.IOException =>
+          info("Reconnect in fetch request due to socket error: ", e)
+          // retry once
+          try {
+            channel = connect
+            sendRequest(request)
+            response = getResponse
+            if (response._2 != 0) {
+              throw new IllegalArgumentException("Incorrect request sent for delete")
+            }
+          }catch {
+            case ioe: java.io.IOException => channel = null; throw ioe;
+          }
+        case e => throw e
+      }
+      val endTime = SystemTime.nanoseconds
+    }
+  }
+
+
   /**
    *  Fetch a set of messages from a topic.
    *

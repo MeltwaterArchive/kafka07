@@ -40,6 +40,7 @@ private[kafka] class KafkaRequestHandlers(val logManager: LogManager) extends Lo
       case RequestKeys.MultiFetch => handleMultiFetchRequest _
       case RequestKeys.MultiProduce => handleMultiProducerRequest _
       case RequestKeys.Offsets => handleOffsetRequest _
+      case RequestKeys.DeleteTopic => handleDeleteRequest _
       case _ => throw new IllegalStateException("No mapping found for handler id " + requestTypeId)
     }
   }
@@ -101,6 +102,18 @@ private[kafka] class KafkaRequestHandlers(val logManager: LogManager) extends Lo
         readMessageSet(fetch)).toList
     
     Some(new MultiMessageSetSend(responses))
+  }
+
+  def handleDeleteRequest(receive: Receive): Option[Send] = {
+    try {
+      val request = DeleteTopicRequest.readFrom(receive.buffer)
+      logManager.deleteTopicFromPartition(request.topic, request.partition)
+      Some(new DeleteSuccessSend(true))
+    }  catch {
+      case t =>
+        error("Error processing delete topic request", t)
+        Some(new DeleteSuccessSend(false))
+    }
   }
 
   private def readMessageSet(fetchRequest: FetchRequest): MessageSetSend = {
