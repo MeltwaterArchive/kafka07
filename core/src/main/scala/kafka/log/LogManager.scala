@@ -109,6 +109,13 @@ private[kafka] class LogManager(val config: KafkaConfig,
               catch {
                 case e => error(e) // log it and let it go
               }
+            case DeleteTopic(topic) =>
+              try {
+                kafkaZookeeper.unregisterTopicInZk(topic)
+              }
+              catch {
+                case e => error(e) // log it and let it go
+              }
             case StopActor =>
               info("zkActor stopped")
               exit
@@ -120,6 +127,7 @@ private[kafka] class LogManager(val config: KafkaConfig,
   }
 
   case object StopActor
+  case class DeleteTopic(topic: String)
 
   private def getMsMap(hoursMap: Map[String, Int]) : Map[String, Long] = {
     var ret = new mutable.HashMap[String, Long]
@@ -369,8 +377,11 @@ private[kafka] class LogManager(val config: KafkaConfig,
         logToRemove.close()
         debug("Deleting segment files for the topic %s".format(topic))
         logToRemove.dir.listFiles().foreach { _.delete() }
-        info("Deleting topic directory")
+        info("Deleting %s directory".format(topic))
         logToRemove.dir.delete()
+        if (config.enableZookeeper) {
+          zkActor ! DeleteTopic(topic)
+        }
       } else {
         throw new IllegalArgumentException("Topic or partition incorrect.")
       }

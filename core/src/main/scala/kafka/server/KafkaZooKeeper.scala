@@ -69,12 +69,26 @@ class KafkaZooKeeper(config: KafkaConfig, logManager: LogManager) extends Loggin
     }
   }
 
+  def unregisterTopicInZk(topic: String) {
+    deleteTopicInZkInternal(topic)
+    lock synchronized {
+      topics = topics.filterNot(_.equals(topic))
+    }
+  }
+
   def registerTopicInZkInternal(topic: String) {
     val brokerTopicPath = ZkUtils.BrokerTopicsPath + "/" + topic + "/" + config.brokerId
     val numParts = logManager.getTopicPartitionsMap.getOrElse(topic, config.numPartitions)
     info("Begin registering broker topic " + brokerTopicPath + " with " + numParts.toString + " partitions")
     ZkUtils.createEphemeralPathExpectConflict(zkClient, brokerTopicPath, numParts.toString)
     info("End registering broker topic " + brokerTopicPath)
+  }
+
+  def deleteTopicInZkInternal(topic: String) {
+    val brokerTopicPath = ZkUtils.BrokerTopicsPath + "/" + topic + "/" + config.brokerId
+    info("Deleting broker topic " + brokerTopicPath +  " partitions from zookeeper")
+    ZkUtils.deletePathRecursive(zkClient, brokerTopicPath)
+    debug("Deleted broker topic " + brokerTopicPath + " from zookeeper")
   }
 
   /**
